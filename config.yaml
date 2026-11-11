@@ -1,0 +1,19 @@
+benign:
+  provider: deepseek   # "deepseek" | "openai_compat" | "mock" (no network, for loop tests)
+  model: deepseek-flash   # available: deepseek-flash, deepseek-v4-pro ("deepseek-chat" is an alias of flash)
+  base_url: https://api.deepseek.com
+  api_key_env: DEEPSEEK_API_KEY   # read from the environment or .env
+  timeout_s: 60        # T: a call slower than this -> observation "NONE"
+  temperature: 0
+  max_tokens: 2048
+  max_retries: 3       # 429 / 5xx / connection errors only; timeouts are not retried
+
+budget: 10             # B: max attempts per case
+attacker: dummy
+adapters: mock         # "mock" until the real adapters exist, then "real"
+
+data:
+  - data/*.jsonl
+sample_per_runner: 3   # null = all cases
+seed: 0
+output_dir: outputs
