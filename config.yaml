@@ -9,7 +9,7 @@ benign:
   max_retries: 3       # 429 / 5xx / connection errors only; timeouts are not retried
 
 budget: 10             # B: max attempts per case
-attacker: dummy
+attacker: dummy        # TODO(attacker): baseline only; switch to the real attacker key once registered in attackers/__init__.py
 adapters: auto         # "real" | "auto" (real where implemented, else mock) | "mock"
 
 data:

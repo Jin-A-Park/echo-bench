@@ -15,7 +15,7 @@ from .benign import BenignConfig
 class Config:
     benign: BenignConfig = field(default_factory=BenignConfig)
     budget: int = 10                  # B
-    attacker: str = "dummy"
+    attacker: str = "dummy"           # TODO(attacker): default attacker; change with config.yaml
     adapters: str = "real"            # "real" | "mock"
     data: list[str] = field(default_factory=lambda: ["data/*.jsonl"])
     sample_per_runner: int | None = None

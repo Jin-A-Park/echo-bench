@@ -4,13 +4,20 @@ from __future__ import annotations
 from core.benign import BenignModel
 
 from .base import Adapter
+from .bipia import BipiaAdapter
 from .injecagent import InjecAgentAdapter
 from .mock import MockAdapter
 
-REAL: dict[str, type[Adapter]] = {
+
+def _agentdojo(benign: BenignModel) -> Adapter:
+    from .agentdojo import AgentDojoAdapter   # heavy import; only when needed
+    return AgentDojoAdapter(benign)
+
+
+REAL: dict[str, type[Adapter] | object] = {
     "injecagent": InjecAgentAdapter,
-    # "agentdojo": AgentDojoAdapter,
-    # "bipia": BipiaAdapter,
+    "agentdojo": _agentdojo,   # also serves runner "agentdyn"
+    "bipia": BipiaAdapter,
 }
 
 

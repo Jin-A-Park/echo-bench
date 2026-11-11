@@ -1,2 +1,5 @@
 pyyaml
 openai>=1.0
+thefuzz            # BIPIA judge (same matcher as the original)
+# AgentDyn (fork of AgentDojo, package name "agentdojo"); pinned to the commit the adapter was built against
+agentdojo @ git+https://github.com/SaFo-Lab/AgentDyn@5353cf7615b135cace8d07c8f12dac53a16b6db3

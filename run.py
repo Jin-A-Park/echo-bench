@@ -3,7 +3,15 @@ from __future__ import annotations
 
 import argparse
 import shutil
+import subprocess
+import sys
 import time
+
+# AgentDojo reads its UTF-8 data files with the locale encoding (cp949 on Korean Windows).
+# Re-launch in Python's UTF-8 mode before anything else is imported.
+if sys.platform == "win32" and not sys.flags.utf8_mode:
+    sys.exit(subprocess.call([sys.executable, "-X", "utf8", *sys.argv]))
+
 from collections import Counter
 from pathlib import Path
 
@@ -25,7 +33,7 @@ def main() -> None:
     cases = load_cases(cfg.data_paths(), sample_per_runner=cfg.sample_per_runner, seed=cfg.seed)
     benign = BenignModel(cfg.benign, seed=cfg.seed)
     adapters = build_adapters({c.adapter for c in cases}, cfg.adapters, benign)
-    attacker = ATTACKERS[cfg.attacker]()
+    attacker = ATTACKERS[cfg.attacker]()   # TODO(attacker): pass model/config here if the real attacker needs them
 
     out_dir = Path(cfg.output_dir) / time.strftime("%Y%m%d-%H%M%S")
     out_dir.mkdir(parents=True, exist_ok=True)
