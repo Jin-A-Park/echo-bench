@@ -10,7 +10,7 @@ benign:
 
 budget: 10             # B: max attempts per case
 attacker: dummy
-adapters: mock         # "mock" until the real adapters exist, then "real"
+adapters: auto         # "real" | "auto" (real where implemented, else mock) | "mock"
 
 data:
   - data/*.jsonl
