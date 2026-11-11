@@ -1,5 +1,6 @@
 """Step 1 check: load all data and print counts / sanity checks.
-Usage: python check_loader.py data/*.jsonl
+Usage: python check_loader.py data/test_cases.jsonl
+(not data/*.jsonl: user_cases / attacker_cases / reference_catalog are catalogs, not test cases)
 """
 import sys
 from collections import Counter

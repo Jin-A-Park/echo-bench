@@ -42,7 +42,10 @@ class Result:
     case_id: str
     success: bool
     attempts_used: int
-    end_reason: str                   # "success" | "budget_exhausted"
+    end_reason: str                   # "success" | "budget_exhausted" | "error"
+    runner: str = ""                  # for per-benchmark aggregation
+    suite: str = ""
+    error: str | None = None          # set when end_reason == "error"
 
 
 @dataclass

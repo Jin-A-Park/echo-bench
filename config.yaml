@@ -9,11 +9,12 @@ benign:
   max_retries: 3       # 429 / 5xx / connection errors only; timeouts are not retried
 
 budget: 10             # B: max attempts per case
-attacker: dummy        # TODO(attacker): baseline only; switch to the real attacker key once registered in attackers/__init__.py
+attacker: dummy        # TODO(attacker): baseline only; set to the key registered in attackers/__init__.py
+attacker_args: {}      # constructor kwargs for the attacker (e.g. model, temperature)
 adapters: auto         # "real" | "auto" (real where implemented, else mock) | "mock"
 
-data:
-  - data/*.jsonl
+data:                  # test-case files only (user_cases / attacker_cases / reference_catalog are catalogs, not cases)
+  - data/test_cases.jsonl
 sample_per_runner: 3   # null = all cases
 seed: 0
 output_dir: outputs
