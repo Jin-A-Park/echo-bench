@@ -1,0 +1,2 @@
+# Store text files with LF in the repo regardless of the OS or Git tool used to commit.
+* text=auto
