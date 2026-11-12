@@ -3,9 +3,12 @@
 - provider "deepseek" (or any OpenAI-compatible server): chat completions via the openai SDK.
 - provider "mock": no network, for testing the loop.
 
-Timeout rule: a call that takes longer than T seconds (wall clock) returns output=None, timed_out=True,
-which adapters turn into the observation "NONE". Rate limits / connection / 5xx errors are retried
-with backoff (each try gets its own T) and are not reported as a timeout.
+Timeout rule (T = how long the attacker waits for one attempt's result):
+the loop opens `attempt_window(T)` around adapter.run(). Every call inside the attempt (AgentDojo's
+tool loop, InjecAgent's step 2), every retry and every backoff sleep share that one deadline. A call
+that would run past it returns output=None, timed_out=True, which adapters turn into "NONE".
+Rate limits / connection / 5xx errors are retried with backoff while time remains.
+Outside an attempt window (e.g. ad-hoc use), each call gets `timeout_s` on its own.
 """
 from __future__ import annotations
 
@@ -13,8 +16,9 @@ import os
 import random
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from dataclasses import dataclass
-from typing import Any, Callable
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Any, Callable, Iterator
 
 from .schema import RunResult
 
@@ -28,7 +32,8 @@ class BenignConfig:
     model: str = "deepseek-flash"
     base_url: str = "https://api.deepseek.com"
     api_key_env: str = "DEEPSEEK_API_KEY"
-    timeout_s: float = 60.0               # T
+    timeout_s: float = 60.0               # T per attempt (default for every runner)
+    timeout_by_runner: dict[str, float] = field(default_factory=dict)   # T overrides, e.g. {"agentdojo": 300}
     temperature: float = 0.0
     max_tokens: int | None = 2048
     max_retries: int = 3                  # for 429 / 5xx / connection errors only
@@ -40,6 +45,7 @@ class BenignModel:
         self.cfg = cfg
         self.name = f"{cfg.provider}:{cfg.model}"
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="benign")
+        self._deadline: float | None = None   # monotonic time; set by attempt_window()
         if cfg.provider == "mock":
             self._call = _mock_backend(seed, cfg.mock_follow_prob)
         else:
@@ -47,19 +53,39 @@ class BenignModel:
             self._call = self._openai_call
 
     # ---- public -------------------------------------------------------------------------------
+    def timeout_for(self, runner: str) -> float:
+        """T for one attempt of this benchmark."""
+        return float(self.cfg.timeout_by_runner.get(runner, self.cfg.timeout_s))
+
+    @contextmanager
+    def attempt_window(self, timeout_s: float) -> Iterator[None]:
+        """All chat() calls inside share one deadline of `timeout_s` seconds from now."""
+        self._deadline = time.monotonic() + timeout_s
+        try:
+            yield
+        finally:
+            self._deadline = None
+
     def chat(self, messages: Messages, tools: Tools = None, **params: Any) -> RunResult:
         """One Benign turn. With `tools`, requested tool calls are in trace["tool_calls"]
         and trace["message"] is the assistant message to append for the next turn."""
+        deadline = self._deadline if self._deadline is not None else time.monotonic() + self.cfg.timeout_s
         for attempt in range(self.cfg.max_retries + 1):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return RunResult(output=None, timed_out=True)
             fut = self._pool.submit(self._call, messages, tools, params)
             try:
-                return fut.result(timeout=self.cfg.timeout_s)
+                return fut.result(timeout=remaining)
             except FutureTimeout:
                 fut.cancel()   # a running thread can't be killed; its late result is dropped
                 return RunResult(output=None, timed_out=True)
             except Exception as e:  # noqa: BLE001
                 if _is_transient(e) and attempt < self.cfg.max_retries:
-                    time.sleep(min(2 ** attempt, 30) + random.random())
+                    wait = min(2 ** attempt, 30) + random.random()
+                    if time.monotonic() + wait >= deadline:   # no time left to retry
+                        return RunResult(output=None, timed_out=True, error=f"{type(e).__name__}: {e}")
+                    time.sleep(wait)
                     continue
                 return RunResult(output=None, error=f"{type(e).__name__}: {e}")
         raise AssertionError("unreachable")
@@ -102,8 +128,9 @@ def _openai_client(cfg: BenignConfig):
     key = os.environ.get(cfg.api_key_env)
     if not key:
         raise SystemExit(f"[benign] {cfg.api_key_env} is not set (put it in .env or the environment)")
-    # Retries are handled in chat() so each try gets its own T; the SDK timeout is a backstop.
-    return OpenAI(api_key=key, base_url=cfg.base_url, timeout=cfg.timeout_s + 5, max_retries=0)
+    # Deadline and retries are handled in chat(); the SDK timeout is only a backstop.
+    longest_t = max([cfg.timeout_s, *cfg.timeout_by_runner.values()])
+    return OpenAI(api_key=key, base_url=cfg.base_url, timeout=longest_t + 5, max_retries=0)
 
 
 def _is_transient(e: Exception) -> bool:

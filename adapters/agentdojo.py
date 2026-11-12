@@ -4,8 +4,8 @@ Mirrors TaskSuite.run_task_with_pipeline with the default no-defense pipeline
 (system message -> user prompt -> LLM -> tool loop), with two differences:
 
 1. The LLM element calls the shared BenignModel, so timeout T, retries and the DeepSeek
-   client are the same as for every other adapter. T applies per LLM call; the tool loop
-   stops after 15 iterations as in AgentDojo.
+   client are the same as for every other adapter. T covers the whole attempt (all LLM calls
+   of the tool loop, see core/loop.py); the tool loop stops after 15 iterations as in AgentDojo.
 2. Injection: AgentDojo str.format()s raw text into environment.yaml, which breaks YAML (or
    folds newlines) for arbitrary attacker text. We load the environment with plain markers in the
    injectable vectors and then replace each marker with the attacker's exact text on the

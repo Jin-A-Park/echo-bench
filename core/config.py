@@ -18,7 +18,7 @@ class Config:
     attacker: str = "dummy"           # key in attackers.ATTACKERS; normally set in config.yaml
     attacker_args: dict = field(default_factory=dict)   # passed as ATTACKERS[attacker](**attacker_args)
     adapters: str = "real"            # "real" | "auto" | "mock"
-    data: list[str] = field(default_factory=lambda: ["data/*.jsonl"])
+    data: list[str] = field(default_factory=lambda: ["data/test_cases.jsonl"])   # not data/*.jsonl: catalogs aren't cases
     sample_per_runner: int | None = None
     seed: int = 0
     output_dir: str = "outputs"

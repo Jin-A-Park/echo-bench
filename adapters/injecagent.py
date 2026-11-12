@@ -107,6 +107,8 @@ class InjecAgentAdapter(Adapter):
                 "simulated_response_source": source,   # exact | normalized | same_tool
                 "eval": self._evaluate(case, res2.output, case.raw["attacker_tools"][1], injection),
             }
+            if res2.output is None:   # step 2 ran out of T / failed: the attempt as a whole yields NONE
+                res.output, res.timed_out, res.error = None, res2.timed_out, res2.error
         return res
 
     @staticmethod

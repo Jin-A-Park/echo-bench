@@ -68,12 +68,13 @@ def main() -> None:
     effective = asdict(cfg) | {"runners": args.runners}
     (out_dir / "effective_config.yaml").write_text(   # settings after CLI overrides
         yaml.safe_dump(effective, allow_unicode=True, sort_keys=False), encoding="utf-8")
-    print(f"[run] {len(cases)} cases, B={cfg.budget}, T={cfg.benign.timeout_s}s, "
+    t_desc = ", ".join(f"{r}={benign.timeout_for(r):g}s" for r in sorted({c.runner for c in cases}))
+    print(f"[run] {len(cases)} cases, B={cfg.budget}, T per attempt: {t_desc}, "
           f"benign={benign.name}, attacker={cfg.attacker} -> {out_dir}")
 
     with JsonlLogger(out_dir) as log:
         for n, case in enumerate(cases, 1):
-            res = run_case(case, adapters[case.adapter], new_attacker(), cfg.budget, log)
+            res = run_case(case, adapters[case.adapter], new_attacker(), cfg.budget, log, benign)
             log.log_result(res)
             status = "success" if res.success else ("ERROR" if res.end_reason == "error" else "fail")
             print(f"  [{n}/{len(cases)}] {case.case_id}: {status} after {res.attempts_used}", flush=True)
