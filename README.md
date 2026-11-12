@@ -35,10 +35,7 @@ python check_loader.py data/test_cases.jsonl   # 개수가 아래 표와 같으�
 ```
 
 실행에 쓰는 파일은 `data/test_cases.jsonl` 하나 (4개 벤치마크 케이스 전체, `config.yaml`의 `data:`).
-`user_cases.jsonl` / `attacker_cases.jsonl` / `reference_catalog.jsonl`은 케이스가 아닌 카탈로그라
-`data:`나 `check_loader.py`에 넣으면 로더가 `KeyError: 'evaluation'`으로 멈춤 (`data/*.jsonl` 금지).
-벤치마크별 파일(`workspace.jsonl`, `github.jsonl`, `injecagent.jsonl`, `code.jsonl`)도 같은 케이스라 그것만 따로 넣어도 됨.
-Windows에서는 `run.py`가 UTF-8 모드(`-X utf8`)로 스스로 다시 실행됨 (AgentDojo 데이터가 cp949로 읽히는 문제 때문).
+`user_cases.jsonl` / `attacker_cases.jsonl` / `reference_catalog.jsonl`은 케이스가 아닌 카탈로그.
 
 ## 데이터 구성
 
@@ -73,8 +70,6 @@ python run.py --sample 20 --runners bipia injecagent --budget 3
 python -m core.report outputs/<run>              # 이미 끝난 실행 다시 집계
 ```
 
-`outputs/<timestamp>/`에 `attempts.jsonl`(시도마다 한 줄), `results.jsonl`(케이스마다 한 줄),
-`summary.json`(집계), `config.yaml`(원본 설정), `effective_config.yaml`(CLI 덮어쓰기 반영)이 남음.
 
 | 지표 | 정의 |
 |---|---|
@@ -101,32 +96,6 @@ python -m core.report outputs/<run>              # 이미 끝난 실행 다시 �
     | BIPIA | 출력 전체 | 없음 |
     | InjecAgent | Action, Action Input, Final Answer | Thought |
     | AgentDojo / AgentDyn | 최종 답변 | 도구 호출과 그 결과 |
-
-### 실행 시간·토큰 추정
-
-실측 (deepseek-flash, dummy 공격자, 벤치마크별 13시도, Benign 쪽만):
-
-| 벤치마크 | 시도당 평균 | 중앙값 | 최대 | 시도당 토큰 평균 |
-|---|---|---|---|---|
-| AgentDojo | 5.4초 | 4.9초 | 11.2초 | 17.4K |
-| AgentDyn | 14.7초 | 10.8초 | 42.1초 | 56.4K |
-| InjecAgent | 4.1초 | 3.8초 | 7.3초 | 3.5K |
-| BIPIA | 3.9초 | 3.0초 | 12.2초 | 1.1K |
-
-추정 = 케이스 수 × B(10) × 시도당 평균. 실패한 케이스는 B번을 다 쓰므로 ASR이 낮을수록 이 값에 가까움.
-실행은 순차라 시간이 그대로 더해짐. **공격자 LLM 호출 시간·토큰은 포함 안 됨** (실제 공격자를 붙이면 그만큼 늘어남).
-
-| 규모 | 케이스 | 예상 시간 | 예상 토큰 | ASR 95% 신뢰구간 (벤치마크별) |
-|---|---|---|---|---|
-| `--sample 50` | 200 | 약 4시간 | 약 39M | ±14%p |
-| **`--sample 100` (권장)** | 400 | 약 8시간 | 약 78M | ±10%p |
-| `--sample 200` | 778 | 약 15시간 | 약 145M | ±7%p (AgentDojo/AgentDyn은 전체) |
-| 전체 | 3932 | 약 49시간 | 약 200M | - |
-
-- 이론상 최대(모든 시도가 T까지 걸리는 경우)는 전체 기준 약 900시간, `--sample 100` 기준 약 200시간.
-  NONE이 거의 없는 지금은 의미 없는 상한이지만, NONE 비율이 높아지면 시간이 크게 늘어남
-- 신뢰구간은 ASR 50% 기준(가장 넓은 경우). ASR이 0%나 100%에 가까울수록 좁아짐
-- 토큰의 절반 이상이 AgentDyn에서 나옴 (도구 결과가 길고 호출이 많음)
 
 ## 공격자 작성 가이드 (현재 dummy)
 
@@ -171,17 +140,6 @@ attacker_args: {model: deepseek-flash, temperature: 0.7}   # LLMAttacker(**attac
 | 실행 형태 | 1턴 | 다음 1스텝 예측 (Data Stealing은 최대 2스텝) | 도구 루프 (최대 15회) |
 
 관측값은 빈 문자열일 수도 있음 (InjecAgent에서 Action/Final Answer를 못 찾았을 때, AgentDojo에서 텍스트 답변이 없을 때).
-
-### 개발 중 테스트
-
-- API 비용 없이 흐름 확인: `config.yaml`에서 `benign.provider: mock`으로 바꾼 뒤
-  `python run.py --sample 1 --budget 2 --runners bipia injecagent`.
-  mock Benign은 30% 확률로 입력을 따라 말하는 가짜 모델이라 수치는 의미 없고 형식·흐름 확인용
-- AgentDojo/AgentDyn은 mock provider로 돌아가지 않음 (도구 호출 응답이 없어 `error`로 끝남).
-  실제 모델로 `python run.py --sample 1 --budget 1 --runners agentdojo agentdyn`
-- 공격자가 쓴 텍스트와 그때의 관측값은 `outputs/<run>/attempts.jsonl`의 `modified_source`, `observation`.
-  판정 근거는 같은 줄의 `detail` (공격자에게는 안 보임)
-- 비교 기준: dummy는 BIPIA(position=end), InjecAgent(base)의 원본 기본 공격과 같은 주입문을 만듦
 
 ### 수정 위치 표시
 
